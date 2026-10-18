@@ -1,0 +1,177 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<title>Карточки: арабский</title>
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#2f6f5e">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<link rel="icon" href="icon-192.png">
+<link rel="apple-touch-icon" href="icon-192.png">
+<link href="https://fonts.googleapis.com/css2?family=Noto+Naskh+Arabic:wght@500&display=swap" rel="stylesheet">
+<style>
+:root{--bg:#faf8f4;--card:#fff;--tx:#1f2328;--mut:#6b7280;--ac:#2f6f5e;--bd:#e5e1d8;--bad:#b4442f;color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#15181a;--card:#1f2326;--tx:#ecebe6;--mut:#9aa0a6;--ac:#6fc2a8;--bd:#33393d;--bad:#e98a76;color-scheme:dark}}
+:root[data-theme="dark"]{--bg:#15181a;--card:#1f2326;--tx:#ecebe6;--mut:#9aa0a6;--ac:#6fc2a8;--bd:#33393d;--bad:#e98a76;color-scheme:dark}
+html,body{height:100%}
+body{margin:0;background:var(--bg);color:var(--tx);font:16px/1.4 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+.app{max-width:520px;margin:0 auto;padding:14px 16px 28px;display:flex;flex-direction:column;gap:12px}
+h1{font-size:18px;margin:0}
+.stats{display:flex;gap:8px;font-size:13px;color:var(--mut);flex-wrap:wrap}
+.stats b{color:var(--tx)}
+.bar{display:flex;gap:8px}
+select,button,textarea{font:inherit;color:var(--tx);background:var(--card);border:1px solid var(--bd);border-radius:10px;padding:9px 12px}
+select{flex:1;min-width:0}
+button{cursor:pointer}
+.card{background:var(--card);border:1px solid var(--bd);border-radius:18px;min-height:260px;padding:22px 16px;display:flex;flex-direction:column;justify-content:center;align-items:center;text-align:center;gap:10px;cursor:pointer;user-select:none}
+.ar{font-family:"Noto Naskh Arabic","Geeza Pro","Traditional Arabic",serif;font-size:40px;line-height:1.8;direction:rtl}
+.ru{font-size:26px}
+.tr{font-size:18px;color:var(--ac)}
+.hint{font-size:13px;color:var(--mut)}
+hr{width:60%;border:0;border-top:1px solid var(--bd);margin:4px 0}
+.rate{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+.rate button{padding:12px 4px;font-weight:600}
+.rate small{display:block;font-weight:400;color:var(--mut);font-size:12px}
+.again{color:var(--bad)}.good{color:var(--ac)}
+details{font-size:14px}
+summary{cursor:pointer;color:var(--mut);margin-bottom:8px}
+textarea{width:100%;box-sizing:border-box;height:130px;resize:vertical}
+.row{display:flex;gap:8px;margin-top:8px;align-items:center;flex-wrap:wrap}
+</style>
+</head>
+<body>
+<div class="app">
+  <h1>Карточки: арабский</h1>
+  <div class="stats" id="stats"></div>
+  <div class="bar">
+    <select id="cat"></select>
+    <button id="dir"></button>
+  </div>
+  <div class="card" id="card"></div>
+  <div class="rate" id="rate" hidden>
+    <button class="again" data-g="0">Не знаю<small>снова</small></button>
+    <button data-g="1">Знаю<small id="i1"></small></button>
+    <button class="good" data-g="2">Легко<small id="i2"></small></button>
+  </div>
+  <details>
+    <summary>Добавить слова / настройки</summary>
+    <textarea id="txt" placeholder="Вставьте список: • كِتَابٌ (китаб) — Книга"></textarea>
+    <div class="row">
+      <button id="add">Добавить</button>
+      <button id="reset">Сбросить прогресс</button>
+      <span class="hint" id="msg"></span>
+    </div>
+  </details>
+</div>
+<script>
+const DEF=`=== СУЩЕСТВИТЕЛЬНЫЕ ===
+• الدَّرْسُ (дарс) — Урок
+• مُدِيرٌ (мудир) — Директор / Менеджер
+• مُحَاسِبٌ (мухасиб) — Бухгалтер
+• رَاتِبٌ (ратиб) — Заработная плата / Зарплата
+• مَدْرَسَةٌ (мадраса) — Школа
+• جَامِعَةٌ (джамиа) — Университет
+• كِتَابٌ (китаб) — Книга
+=== ГЛАГОЛЫ ===
+• كَتَبَ / يَكْتُبُ (катаба / яктубу) — Писать
+• قَرَأَ / يَقْرَأُ (караа / якрау) — Читать
+=== ПРИЛАГАТЕЛЬНЫЕ ===
+• جَدِيدٌ / جَدِيدَةٌ (джадид / джадида) — Новый / Новая
+• جَمِيلٌ (джамиль) — Красивый
+=== ПРЕДЛОГИ ===
+• أَيْنَ (айна) — Где`;
+const K='ar-cards-v1',D=864e5,IV=[0,6e5,D,3*D,7*D,21*D];
+const LB=['','10 мин','1 дн','3 дн','7 дн','21 дн'];
+const ARB=/[\u0600-\u06FF]/;
+let S={cards:[],dir:'ar',cat:'all'},q=[],cur=null,flip=false;
+const $=id=>document.getElementById(id);
+const esc=s=>String(s).replace(/[&<>]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[c]));
+function save(){try{localStorage.setItem(K,JSON.stringify(S))}catch(e){}}
+function parse(txt){let cat='Слова',out=[];
+  for(const raw of txt.split('\n')){const l=raw.trim();
+    let m=l.match(/^=+\s*(.+?)\s*=+$/);if(m){cat=m[1];continue}
+    m=l.match(/^[•\-*]\s*(.+?)\s*\((.+?)\)\s*[—–]\s*(.+)$/);if(!m)continue;
+    let f=m[1],r=m[2];if(!ARB.test(f)&&ARB.test(r))[f,r]=[r,f];
+    out.push({f,r,t:m[3],c:cat,box:0,due:0})}
+  return out}
+function add(txt){const have=new Set(S.cards.map(c=>c.f));let n=0;
+  for(const c of parse(txt))if(!have.has(c.f)){S.cards.push(c);have.add(c.f);n++}
+  save();return n}
+function load(){try{const j=localStorage.getItem(K);if(j)S=Object.assign(S,JSON.parse(j))}catch(e){}
+  if(!S.cards.length)add(DEF)}
+function inCat(c){return S.cat==='all'||c.c===S.cat}
+function build(all){const now=Date.now();
+  q=S.cards.filter(c=>inCat(c)&&(all||c.due<=now));
+  for(let i=q.length-1;i>0;i--){const j=Math.random()*(i+1)|0;[q[i],q[j]]=[q[j],q[i]]}
+  q=q.slice(0,30);next()}
+function next(){cur=q.shift()||null;flip=false;render()}
+function rate(g){if(!cur)return;
+  if(g===0){cur.box=0;cur.due=Date.now();q.push(cur)}
+  else{cur.box=Math.min(5,cur.box+(g===2?2:1));cur.due=Date.now()+IV[cur.box]}
+  save();next()}
+function render(){
+  const cs=S.cards.filter(inCat);
+  $('stats').innerHTML=`Всего: <b>${cs.length}</b> · Новые: <b>${cs.filter(c=>c.box===0).length}</b> · В процессе: <b>${cs.filter(c=>c.box>0&&c.box<3).length}</b> · Выучено: <b>${cs.filter(c=>c.box>=3).length}</b> · В очереди: <b>${q.length+(cur?1:0)}</b>`;
+  const cats=[...new Set(S.cards.map(c=>c.c))];
+  $('cat').innerHTML='<option value="all">Все разделы</option>'+cats.map(c=>`<option ${c===S.cat?'selected':''}>${esc(c)}</option>`).join('');
+  $('cat').value=S.cat;
+  $('dir').textContent=S.dir==='ar'?'عربي → рус':'рус → عربي';
+  const el=$('card');
+  if(!cur){el.innerHTML='<div class="ru">На сегодня всё 🎉</div><div class="hint">Нажмите, чтобы повторить все слова</div>';
+    el.onclick=()=>build(true);$('rate').hidden=true;return}
+  el.onclick=()=>{flip=true;render()};
+  const A=`<div class="ar" lang="ar" dir="rtl">${esc(cur.f)}</div>`,R=`<div class="ru">${esc(cur.t)}</div>`,T=`<div class="tr">${esc(cur.r)}</div>`;
+  const front=S.dir==='ar'?A:R;
+  el.innerHTML=flip?front+'<hr>'+(S.dir==='ar'?R:A)+T:front+'<div class="hint">Нажмите, чтобы перевернуть</div>';
+  $('rate').hidden=!flip;
+  if(flip){$('i1').textContent=LB[Math.min(5,cur.box+1)];$('i2').textContent=LB[Math.min(5,cur.box+2)]}}
+$('rate').onclick=e=>{const b=e.target.closest('button');if(b)rate(+b.dataset.g)};
+$('cat').onchange=e=>{S.cat=e.target.value;save();build()};
+$('dir').onclick=()=>{S.dir=S.dir==='ar'?'ru':'ar';save();render()};
+$('add').onclick=()=>{const n=add($('txt').value);$('msg').textContent=n?`Добавлено слов: ${n}`:'Новых слов не найдено';if(n){$('txt').value='';build()}};
+$('reset').onclick=()=>{S.cards.forEach(c=>{c.box=0;c.due=0});save();build();$('msg').textContent='Прогресс сброшен'};
+document.addEventListener('keydown',e=>{if(e.target.tagName==='TEXTAREA')return;
+  if(e.code==='Space'&&cur&&!flip){e.preventDefault();flip=true;render()}
+  else if(flip&&'123'.includes(e.key))rate(+e.key-1)});
+load();build();
+if("serviceWorker" in navigator){window.addEventListener("load",()=>{navigator.serviceWorker.register("sw.js").catch(()=>{})})}
+</script>
+</body>
+</html>
+
+{
+  "name": "Карточки: арабский",
+  "short_name": "Арабский",
+  "start_url": "./index.html",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#faf8f4",
+  "theme_color": "#2f6f5e",
+  "lang": "ru",
+  "icons": [
+    {"src": "icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any"},
+    {"src": "icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any"},
+    {"src": "icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable"}
+  ]
+}
+
+const V = 'ar-cards-v1';
+const CORE = ['./', './index.html', './manifest.json', './icon-192.png', './icon-512.png'];
+self.addEventListener('install', e => {
+  e.waitUntil(caches.open(V).then(c => c.addAll(CORE)).then(() => self.skipWaiting()));
+});
+self.addEventListener('activate', e => {
+  e.waitUntil(caches.keys().then(ks => Promise.all(ks.filter(k => k !== V).map(k => caches.delete(k)))).then(() => self.clients.claim()));
+});
+self.addEventListener('fetch', e => {
+  if (e.request.method !== 'GET') return;
+  e.respondWith(caches.match(e.request).then(hit => {
+    const net = fetch(e.request).then(r => {
+      if (r && (r.ok || r.type === 'opaque')) { const cp = r.clone(); caches.open(V).then(c => c.put(e.request, cp)); }
+      return r;
+    }).catch(() => hit || caches.match('./index.html'));
+    return hit || net;
+  }));
+});
